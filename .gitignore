@@ -2,3 +2,4 @@
 /storage/*
 /node_modules
 /logs/*
+/.wwebjs_cache/
