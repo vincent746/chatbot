@@ -4,7 +4,7 @@ class AiService {
     constructor() {
         this.apiToken = process.env.OPENROUTER_API_TOKEN;
         this.baseUrl = 'https://openrouter.ai/api/v1';
-        this.defaultModel = 'meta-llama/llama-3.3-70b-instruct:free'; // You can change this to other models available on OpenRouter
+        this.defaultModel = process.env.OPENROUTER_DEFAULT_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
         
         if (!this.apiToken) {
             console.warn('Warning: OPENROUTER_API_TOKEN not found in environment variables');

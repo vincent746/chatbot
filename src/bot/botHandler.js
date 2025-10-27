@@ -1,5 +1,6 @@
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
+const qrImage = require('qr-image');
 const fs = require('fs-extra');
 const path = require('path');
 const ragEngine = require('../rag/ragEngine');
@@ -110,6 +111,12 @@ class BotHandler {
 
         // Incoming messages
         this.client.on('message', async (message) => {
+            console.log('🔔 Message received event fired:', {
+                from: message.from,
+                body: message.body,
+                fromMe: message.fromMe,
+                hasMedia: !!message.hasMedia
+            });
             await this.handleIncomingMessage(message);
         });
 
@@ -127,12 +134,21 @@ class BotHandler {
      */
     async handleIncomingMessage(message) {
         try {
+            console.log('📥 Processing incoming message:', {
+                from: message.from,
+                body: message.body,
+                fromMe: message.fromMe,
+                isGroup: message.from.includes('@g.us')
+            });
+            
             // Skip messages from groups, status updates, or from bot itself
             if (message.from.includes('@g.us') || message.from.includes('status') || message.fromMe) {
+                console.log('⏭️ Skipping message (group/status/self)');
                 return;
             }
 
             const userId = message.from;
+            // User ketik di WhatsApp: "Jam buka berapa?"
             const messageBody = message.body.trim();
 
             // Log incoming message
@@ -298,14 +314,22 @@ class BotHandler {
             // Ensure directory exists
             await fs.ensureDir(qrDir);
 
-            // Generate QR code image (you might want to use a QR code image library here)
-            // For now, we'll save the QR data as text file
-            const qrTextPath = path.join(qrDir, `qr-${timestamp}.txt`);
-            await fs.writeFile(qrTextPath, qrData);
+            // Generate QR code as PNG image
+            const qrImageBuffer = qrImage.image(qrData, { type: 'png', size: 10 });
+            
+            // Write to file
+            const writeStream = fs.createWriteStream(qrFilePath);
+            qrImageBuffer.pipe(writeStream);
 
-            logger.success('QR code saved', { 
-                path: qrTextPath,
-                directory: qrDir 
+            await new Promise((resolve, reject) => {
+                writeStream.on('finish', resolve);
+                writeStream.on('error', reject);
+            });
+
+            logger.success('QR code saved as PNG image', { 
+                path: qrFilePath,
+                directory: qrDir,
+                format: 'PNG'
             });
 
         } catch (error) {
