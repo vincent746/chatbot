@@ -136,6 +136,17 @@ class Logger {
     }
 
     /**
+     * WhatsApp / Puppeteer diagnostic line (always written; filter files by [WA-DIAG]).
+     * Set WA_DIAGNOSTIC_LOG=false to disable.
+     */
+    waDiag(message, data = null) {
+        if (process.env.WA_DIAGNOSTIC_LOG === 'false') {
+            return;
+        }
+        this.writeLog('INFO', `[WA-DIAG] ${message}`, data);
+    }
+
+    /**
      * Log WhatsApp message activity
      * @param {string} from - Sender phone number
      * @param {string} message - Message content

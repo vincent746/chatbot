@@ -38,38 +38,6 @@ AI gabungkan dengan GPT untuk jawab natural
 Bot kirim jawaban yang akurat
 ```
 
-## 📁 Struktur Project
-
-```
-chatbot-rag-whatsapp/
-├── src/
-│   ├── bot/                # Logika WhatsApp bot
-│   │   └── botHandler.js
-│   ├── rag/                # Sistem RAG (retrieval AI)
-│   │   └── ragEngine.js
-│   ├── services/           # Integrasi eksternal
-│   │   ├── pdfService.js   # Service untuk membaca PDF
-│   │   ├── sheetService.js # Service Google Sheets
-│   │   └── aiService.js    # Service OpenRouter AI
-│   ├── routes/             # API routes
-│   │   └── botRoutes.js
-│   ├── controllers/        # Controllers
-│   │   └── botController.js
-│   ├── models/             # Data models
-│   │   └── messageModel.js
-│   └── helper/             # Helper functions
-│       └── logger.js
-├── storage/
-│   ├── qrcode/            # QR codes dengan struktur tanggal
-│   │   └── 2025/10/25/
-│   └── rules/             # PDF knowledge base
-│       └── info_toko_sepatu.pdf
-├── logs/                  # Log files
-├── index.js              # Entry point
-├── package.json
-└── README.md
-```
-
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
@@ -374,14 +342,6 @@ MIT License - lihat file LICENSE untuk detail.
 - Pastikan terminal support UTF-8
 - Cek folder `storage/qrcode` permission
 - Restart bot
-
-## 📞 Support
-
-Untuk bantuan dan pertanyaan:
-- Buat issue di GitHub
-- Email: [your-email]
-- Documentation: [link-to-docs]
-
 ---
 
 **Dibuat dengan ❤️ untuk otomasi customer service WhatsApp**
