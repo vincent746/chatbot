@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('../helper/logger');
 
 class AiService {
     constructor() {
@@ -84,7 +85,7 @@ class AiService {
      * @returns {string} Fallback response
      */
     getFallbackResponse(prompt) {
-        const storeName = process.env.STORE_NAME || 'Toko Sepatu Berkualitas';
+        const storeName = process.env.STORE_NAME || 'Toko Conveyor Belt dan Safety';
         
         // Simple keyword-based responses
         const lowerPrompt = prompt.toLowerCase();
@@ -125,25 +126,6 @@ class AiService {
         }
     }
 
-    /**
-     * Get available models (if needed for dynamic model selection)
-     * @returns {Promise<Array>} Array of available models
-     */
-    async getAvailableModels() {
-        try {
-            const response = await axios.get(`${this.baseUrl}/models`, {
-                headers: {
-                    'Authorization': `Bearer ${this.apiToken}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            return response.data.data || [];
-        } catch (error) {
-            console.error('Error fetching available models:', error.message);
-            return [];
-        }
-    }
 }
 
 module.exports = new AiService();
