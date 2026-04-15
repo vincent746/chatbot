@@ -20,6 +20,16 @@ class BotController {
                 });
             }
 
+            // Guard: tolak request concurrent selama bot sedang dalam proses initialize
+            if (botHandler.isInitializing) {
+                logger.warn('[DIAG] Duplicate /initialize request blocked — bot is already initializing');
+                return res.status(409).json({
+                    success: false,
+                    message: 'Bot is already being initialized. Please wait and scan the QR code that was already generated.',
+                    status: botHandler.getStatus()
+                });
+            }
+
             await botHandler.initialize();
             
             res.json({

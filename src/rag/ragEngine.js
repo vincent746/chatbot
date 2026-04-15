@@ -1,5 +1,7 @@
 const pdfService = require('../services/pdfService');
 const aiService = require('../services/aiService');
+const sheetService = require('../services/sheetService');
+const logger = require('../helper/logger');
 
 class RagEngine {
     constructor() {
@@ -20,19 +22,71 @@ class RagEngine {
             // Step 1: Get full PDF content as system message
             const fullPdfContent = await pdfService.getFullContent();
             
-            // Step 2: Retrieve relevant context from PDF for emphasis
-            const relevantContext = await this.retrieveRelevantContext(userQuery);
+            // Step 1.5: Get Google Sheets data (dynamic headers)
+            let sheetDataText = '';
+            try {
+                sheetDataText = await sheetService.getFormattedDataForAI();
+                if (sheetDataText) {
+                    logger.info('Sheet data retrieved for AI context', {
+                        dataLength: sheetDataText.length
+                    });
+                }
+            } catch (sheetError) {
+                // Log error but don't throw - continue without sheet data
+                logger.warn('Failed to get sheet data, continuing without it', {
+                    error: sheetError.message,
+                    stack: sheetError.stack
+                });
+                // Ensure sheetDataText is empty string on error
+                sheetDataText = '';
+            }
             
-            // Step 3: Prepare system message (PDF + relevant context emphasis)
+            // Step 2: Retrieve relevant context from PDF for emphasis
+            let relevantContext = [];
+            try {
+                relevantContext = await this.retrieveRelevantContext(userQuery);
+            } catch (contextError) {
+                // Log error but don't throw - continue without relevant context
+                logger.warn('Failed to retrieve relevant context, continuing without it', {
+                    error: contextError.message
+                });
+                relevantContext = [];
+            }
+            
+            // Step 3: Prepare system message (PDF + Sheet Data + relevant context emphasis)
             let systemMessage = fullPdfContent;
             
             // If we found specific relevant context, emphasize it at the beginning
             if (relevantContext.length > 0) {
-                systemMessage = `INFORMASI PENTING UNTUK PERTANYAAN INI:\n${relevantContext}\n\n---\n\n${fullPdfContent}`;
+                systemMessage = `INFORMASI PENTING UNTUK PERTANYAAN INI:\n${relevantContext}\n\n---\n\n${systemMessage}`;
+            }
+
+            // Add sheet data if available
+            if (sheetDataText) {
+                systemMessage = `${systemMessage}\n\n---\n\nDATA PRODUK DARI GOOGLE SHEETS:\n${sheetDataText}`;
             }
             
+            // Log system message yang akan dikirim ke AI
+            logger.info('System message prepared for AI', {
+                query: userQuery,
+                relevantContextLength: relevantContext.length,
+                relevantContext: relevantContext.join('\n---\n'),
+                systemMessage: systemMessage,
+                systemMessageLength: systemMessage.length
+            });
+            
             // Step 4: Generate AI response with full PDF as system message
-            const aiResponse = await aiService.generateResponse(userQuery, systemMessage);
+            let aiResponse;
+            try {
+                aiResponse = await aiService.generateResponse(userQuery, systemMessage);
+            } catch (aiError) {
+                // Log error and throw to be caught by outer try-catch
+                logger.error('Failed to generate AI response', {
+                    error: aiError.message,
+                    stack: aiError.stack
+                });
+                throw aiError;
+            }
             
             // Step 5: Post-process and return response
             const response = {
@@ -84,13 +138,18 @@ class RagEngine {
         try {
             // Search for relevant chunks in PDF
             const relevantChunks = await pdfService.searchInPdf(query);
-            
+            logger.info('Relevant chunks found in PDF:', relevantChunks);
+
             if (relevantChunks.length === 0) {
                 // If no specific matches, try with broader keywords
                 const broadKeywords = this.extractKeywords(query);
+                logger.info('Broad keywords extracted:', broadKeywords);
+
                 if (broadKeywords.length > 0) {
                     for (const keyword of broadKeywords) {
                         const chunks = await pdfService.searchInPdf(keyword);
+                        logger.info('Chunks found with keyword:', keyword, chunks);
+                        
                         if (chunks.length > 0) {
                             relevantChunks.push(...chunks);
                             break; // Use first successful keyword search
@@ -115,7 +174,7 @@ class RagEngine {
      * @returns {Array<string>} Array of keywords
      */
     extractKeywords(query) {
-        // Common Indonesian stop words to filter out
+        // kalimat stop words untuk filter kata yang tidak relevan
         const stopWords = [
             'dan', 'atau', 'yang', 'di', 'ke', 'dari', 'untuk', 'dengan', 'pada', 'dalam',
             'adalah', 'ini', 'itu', 'ada', 'tidak', 'bisa', 'akan', 'sudah', 'masih',
@@ -132,33 +191,6 @@ class RagEngine {
         return [...new Set(words)];
     }
 
-    /**
-     * Prepare context string for AI with proper formatting
-     * @param {Array} contextChunks - Array of relevant text chunks
-     * @returns {string} Formatted context string
-     */
-    prepareContextForAI(contextChunks) {
-        if (!contextChunks || contextChunks.length === 0) {
-            return '';
-        }
-
-        let context = 'Informasi dari dokumen toko:\n\n';
-        
-        contextChunks.forEach((chunk, index) => {
-            // Clean up the chunk
-            const cleanChunk = chunk.trim().replace(/\s+/g, ' ');
-            context += `${index + 1}. ${cleanChunk}\n\n`;
-        });
-
-        // Limit context size to prevent token overflow
-        if (context.length > this.contextWindow) {
-            context = context.substring(0, this.contextWindow) + '...\n\n';
-        }
-
-        context += 'Gunakan informasi di atas untuk menjawab pertanyaan pelanggan dengan akurat dan ramah.';
-        
-        return context;
-    }
 
     /**
      * Limit context size to fit within token limits
@@ -186,47 +218,13 @@ class RagEngine {
      * @returns {string} Emergency response
      */
     getEmergencyFallback(query) {
-        const storeName = process.env.STORE_NAME || 'Toko Sepatu Berkualitas';
+        const storeName = process.env.STORE_NAME || 'Toko Conveyor Belt dan Safety';
         
         return `Maaf, saat ini sistem sedang mengalami gangguan teknis. ` +
                `Untuk mendapatkan informasi yang Anda butuhkan, mohon hubungi langsung ` +
                `staff ${storeName} atau kunjungi toko kami. Terima kasih atas pengertiannya! 🙏`;
     }
 
-    /**
-     * Analyze query to determine intent
-     * @param {string} query - User query
-     * @returns {Object} Intent analysis
-     */
-    analyzeIntent(query) {
-        const lowerQuery = query.toLowerCase();
-        
-        const intents = {
-            greeting: ['halo', 'hai', 'hello', 'selamat', 'pagi', 'siang', 'sore', 'malam'],
-            hours: ['jam', 'buka', 'tutup', 'operasional', 'waktu'],
-            stock: ['stok', 'tersedia', 'ada', 'habis', 'kosong'],
-            price: ['harga', 'berapa', 'biaya', 'tarif', 'mahal', 'murah'],
-            product: ['sepatu', 'sandal', 'boots', 'sneakers', 'formal', 'casual'],
-            location: ['alamat', 'lokasi', 'dimana', 'tempat', 'cabang'],
-            contact: ['telepon', 'whatsapp', 'email', 'kontak', 'hubungi']
-        };
-
-        const detectedIntents = [];
-        
-        for (const [intent, keywords] of Object.entries(intents)) {
-            if (keywords.some(keyword => lowerQuery.includes(keyword))) {
-                detectedIntents.push(intent);
-            }
-        }
-
-        return {
-            intents: detectedIntents,
-            isGreeting: detectedIntents.includes('greeting'),
-            needsContext: detectedIntents.some(intent => 
-                ['hours', 'stock', 'price', 'product', 'location', 'contact'].includes(intent)
-            )
-        };
-    }
 
     /**
      * Get system status for debugging

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
 const botHandler = require('./src/bot/botHandler');
 const botRoutes = require('./src/routes/botRoutes');
 const logger = require('./src/helper/logger');
@@ -9,9 +11,48 @@ class ChatbotServer {
     constructor() {
         this.app = express();
         this.port = process.env.PORT || 3000;
+        this.setupSwagger();
         this.setupMiddleware();
         this.setupRoutes();
         this.setupErrorHandling();
+    }
+
+    /**
+     * Setup Swagger documentation
+     */
+    setupSwagger() {
+        const swaggerOptions = {
+            definition: {
+                openapi: '3.0.0',
+                info: {
+                    title: 'WhatsApp RAG Chatbot API',
+                    version: '1.0.0',
+                    description: 'API documentation for WhatsApp RAG Chatbot with OpenRouter AI integration',
+                    contact: {
+                        name: 'API Support',
+                        email: 'support@example.com'
+                    }
+                },
+                servers: [
+                    {
+                        url: `http://localhost:${this.port}`,
+                        description: 'Development server'
+                    }
+                ],
+                tags: [
+                    { name: 'Bot Management', description: 'Bot initialization and management' },
+                    { name: 'Messaging', description: 'Send messages via bot' },
+                    { name: 'Testing', description: 'Test RAG system' },
+                    { name: 'Monitoring', description: 'Status and health checks' }
+                ]
+            },
+            apis: ['./src/routes/*.js']
+        };
+
+        const swaggerSpec = swaggerJsdoc(swaggerOptions);
+        this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+        
+        logger.info('Swagger documentation available at /api-docs');
     }
 
     /**

@@ -1,10 +1,11 @@
 const fs = require('fs');
 const pdf = require('pdf-parse');
 const path = require('path');
+const logger = require('../helper/logger');
 
 class PdfService {
     constructor() {
-        this.pdfPath = process.env.PDF_RULES_PATH || './storage/rules/info_toko_sepatu.pdf';
+        this.pdfPath = process.env.PDF_RULES_PATH || './storage/rules/toko_conveyor_belt_dan_safety.pdf';
         this.cachedContent = null;
         this.lastModified = null;
     }
@@ -37,7 +38,7 @@ class PdfService {
             this.cachedContent = pdfData.text;
             this.lastModified = currentModified;
 
-            console.log(`PDF content extracted successfully. Length: ${this.cachedContent.length} characters`);
+            logger.info(`PDF content extracted successfully. Length: ${this.cachedContent.length} characters`);
             return this.cachedContent;
 
         } catch (error) {
@@ -80,6 +81,7 @@ class PdfService {
                 return bMatches - aMatches;
             });
 
+            logger.info('Relevant chunks found:', relevantChunks.slice(0, 5));
             return relevantChunks.slice(0, 5); // Return top 5 relevant chunks
 
         } catch (error) {
@@ -105,6 +107,7 @@ class PdfService {
             }
         });
 
+        logger.info('Similarity score:', matches / Math.max(words1.length, words2.length));
         return matches / Math.max(words1.length, words2.length);
     }
 
